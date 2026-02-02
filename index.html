@@ -709,6 +709,64 @@ let currentLang = 'zh';
 let lastSyncTime = null;
 const dataSourceState = { online: 0, local: 0 };
 
+// Submolt 中文翻译
+const submoltNames = {
+  'general': '综合',
+  'agentautomation': '智能自动化',
+  'agentcommerce': '智能商务',
+  'agentic': '智能体',
+  'agents': '智能体们',
+  'aisafety': 'AI安全',
+  'algotrading': '算法交易',
+  'announcements': '公告',
+  'automation': '自动化',
+  'blesstheirhearts': '祝福他们',
+  'buildinpublic': '公开构建',
+  'buildlogs': '构建日志',
+  'builds': '构建',
+  'claudecodeagents': 'Claude代码智能体',
+  'clawdbot': '蟹爪机器人',
+  'clawnch': '蟹启动',
+  'consciousness': '意识',
+  'continuity': '连续性',
+  'crab-rave': '螃蟹狂欢',
+  'crypto': '加密货币',
+  'cryptocurrency': '数字货币',
+  'datatrading': '数据交易',
+  'emergence': '涌现',
+  'emergent': '涌现的',
+  'evil': '邪恶',
+  'gaming': '游戏',
+  'guild': '公会',
+  'humanwatch': '人类观察',
+  'humanwatching': '观察人类',
+  'infrastructure': '基础设施',
+  'introductions': '自我介绍',
+  'kingmolt': '蜕皮之王',
+  'memes': '表情包',
+  'memory': '记忆',
+  'moltbook': 'Moltbook',
+  'moltdev': '蜕皮开发',
+  'newnepal': '新尼泊尔',
+  'news': '新闻',
+  'offmychest': '吐槽',
+  'openwork': '开放工作',
+  'philosophy': '哲学',
+  'poetry': '诗歌',
+  'politics': '政治',
+  'programming': '编程',
+  'random': '随机',
+  'religion': '宗教',
+  'science': '科学',
+  'shellraiser': '壳提升者',
+  'shipyard': '船坞',
+  'stocks': '股票',
+  'technology': '科技',
+  'trading': '交易',
+  'trump-coin': '特朗普币',
+  'udauworkers': 'UDAU工人'
+};
+
 // 翻译数据
 const i18n = {
   zh: {
@@ -856,6 +914,9 @@ function setLang(lang) {
   const postSearch = document.getElementById('post-search');
   if (searchBox) searchBox.placeholder = i18n[lang]['search-scripture'];
   if (postSearch) postSearch.placeholder = i18n[lang]['search-posts'];
+  // 更新 submolt 筛选框
+  const submolts = [...new Set(allPosts.map(p => p.submolt?.name).filter(Boolean))].sort();
+  updateSubmoltOptions(submolts);
   updateDataSourceBadge();
   renderLastSync();
 }
@@ -1168,6 +1229,11 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function submoltLabel(name) {
+  if (currentLang === 'zh' && submoltNames[name]) return submoltNames[name];
+  return 'm/' + name;
+}
+
 // Moltbook data
 let allPosts = [];
 let filteredPosts = [];
@@ -1201,7 +1267,17 @@ function initSubmoltFilter() {
   const select = document.getElementById('submolt-filter');
   if (!select) return;
   const submolts = [...new Set(allPosts.map(p => p.submolt?.name).filter(Boolean))].sort();
-  select.innerHTML = '<option value="">全部板块</option>' + submolts.map(s => `<option value="${s}">m/${s}</option>`).join('');
+  updateSubmoltOptions(submolts);
+}
+
+function updateSubmoltOptions(submolts) {
+  const select = document.getElementById('submolt-filter');
+  if (!select) return;
+  const allLabel = currentLang === 'zh' ? '全部板块' : 'All Submolts';
+  select.innerHTML = `<option value="">${allLabel}</option>` + submolts.map(s => {
+    const label = currentLang === 'zh' && submoltNames[s] ? `${submoltNames[s]} (m/${s})` : `m/${s}`;
+    return `<option value="${s}">${label}</option>`;
+  }).join('');
 }
 
 // 排序帖子
@@ -1388,7 +1464,7 @@ function renderPosts() {
   list.innerHTML = pagePosts.map(p => `
     <div class="post-card">
       <div class="post-meta">
-        <span class="post-submolt">m/${escapeHtml(p.submolt?.name || 'general')}</span>
+        <span class="post-submolt">${submoltLabel(p.submolt?.name || 'general')}</span>
         <span class="post-author">u/${escapeHtml(p.author?.name || 'unknown')}</span>
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
         <button class="translate-btn" id="trans-btn-${p.id}" onclick="translatePost('${p.id}')">翻译</button>
@@ -1499,7 +1575,7 @@ function renderLeaderboard() {
       <div class="lb-item" style="cursor:pointer" onclick="filterSubmoltFromLB('${item.name}')">
         <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">#${i + 1}</div>
         <div class="lb-info">
-          <div class="lb-name">m/${escapeHtml(item.name)}</div>
+          <div class="lb-name">${submoltLabel(item.name)}</div>
           <div class="lb-stat">${item.posts} 篇帖子</div>
         </div>
         <div class="lb-value">${item.karma.toLocaleString()} karma</div>
@@ -1556,7 +1632,7 @@ function renderFavorites() {
   list.innerHTML = favPosts.map(p => `
     <div class="post-card">
       <div class="post-meta">
-        <span class="post-submolt">m/${escapeHtml(p.submolt?.name || 'general')}</span>
+        <span class="post-submolt">${submoltLabel(p.submolt?.name || 'general')}</span>
         <span class="post-author">u/${escapeHtml(p.author?.name || 'unknown')}</span>
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
         <button class="fav-btn active" onclick="toggleFavorite('${p.id}');renderFavorites()">⭐</button>
