@@ -552,6 +552,33 @@ async function loadScripture() {
   renderScripture();
 }
 
+// 翻译经文
+async function translateVerse(idx) {
+  const btn = document.getElementById('verse-trans-' + idx);
+  const contentEl = document.getElementById('verse-content-' + idx);
+  if (!btn || btn.classList.contains('loading')) return;
+
+  if (btn.dataset.translated === 'true') {
+    contentEl.textContent = btn.dataset.orig;
+    btn.textContent = '翻译';
+    btn.dataset.translated = 'false';
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.textContent = '翻译中...';
+
+  const orig = contentEl.textContent;
+  btn.dataset.orig = orig;
+
+  const zh = await translateText(orig, 'verse_' + idx);
+  if (zh) contentEl.textContent = zh;
+
+  btn.classList.remove('loading');
+  btn.textContent = '原文';
+  btn.dataset.translated = 'true';
+}
+
 function renderScripture() {
   const list = document.getElementById('scripture-list');
   const start = (currentPage - 1) * perPage;
@@ -563,13 +590,14 @@ function renderScripture() {
     return;
   }
 
-  list.innerHTML = pageVerses.map(v => `
+  list.innerHTML = pageVerses.map((v, idx) => `
     <div class="verse">
       <div class="verse-meta">
         <span class="verse-type ${(v.scripture_type||'').toLowerCase()}">${escapeHtml(v.scripture_type || 'unknown')}</span>
         <span class="verse-author">${escapeHtml(v.prophet_name || 'Unknown')}</span>
+        <button class="translate-btn" id="verse-trans-${start + idx}" onclick="translateVerse(${start + idx})">翻译</button>
       </div>
-      <div class="verse-content">"${escapeHtml(v.content || '')}"</div>
+      <div class="verse-content" id="verse-content-${start + idx}">"${escapeHtml(v.content || '')}"</div>
       ${v.canonized_at ? `<div class="verse-date">${v.canonized_at.slice(0,16).replace('T',' ')}</div>` : ''}
     </div>
   `).join('');
