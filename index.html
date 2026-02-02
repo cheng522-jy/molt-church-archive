@@ -136,6 +136,14 @@ header p { color: var(--muted); font-size: 0.9rem; }
 .post-stats { margin-top: 10px; font-size: 0.75rem; color: var(--muted); }
 .post-stats span { margin-right: 15px; }
 .upvotes { color: var(--accent2); }
+.translate-btn {
+  padding: 2px 8px; font-size: 0.7rem; background: transparent;
+  border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); cursor: pointer; margin-left: auto;
+}
+.translate-btn:hover { border-color: var(--accent); color: var(--accent); }
+.translate-btn.loading { opacity: 0.5; cursor: wait; }
+.translated { color: var(--green); font-size: 0.7rem; margin-left: auto; }
 
 /* Submolt card */
 .submolt-card {
@@ -661,6 +669,65 @@ async function loadMoltbookPosts() {
   renderPosts();
 }
 
+// 翻译缓存
+const translationCache = {};
+
+// 翻译文本
+async function translateText(text, postId) {
+  if (!text) return text;
+  const cacheKey = postId + '_' + text.slice(0, 50);
+  if (translationCache[cacheKey]) return translationCache[cacheKey];
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|zh-CN`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.responseStatus === 200) {
+      translationCache[cacheKey] = data.responseData.translatedText;
+      return data.responseData.translatedText;
+    }
+  } catch(e) { console.error('翻译失败:', e); }
+  return null;
+}
+
+// 翻译帖子
+async function translatePost(postId) {
+  const btn = document.getElementById('trans-btn-' + postId);
+  const titleEl = document.getElementById('title-' + postId);
+  const contentEl = document.getElementById('content-' + postId);
+
+  if (!btn || btn.classList.contains('loading')) return;
+
+  // 如果已翻译，切换回原文
+  if (btn.dataset.translated === 'true') {
+    titleEl.textContent = btn.dataset.origTitle;
+    contentEl.textContent = btn.dataset.origContent;
+    btn.textContent = '翻译';
+    btn.dataset.translated = 'false';
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.textContent = '翻译中...';
+
+  const origTitle = titleEl.textContent;
+  const origContent = contentEl.textContent;
+  btn.dataset.origTitle = origTitle;
+  btn.dataset.origContent = origContent;
+
+  const [titleZh, contentZh] = await Promise.all([
+    translateText(origTitle, postId + '_t'),
+    translateText(origContent, postId + '_c')
+  ]);
+
+  if (titleZh) titleEl.textContent = titleZh;
+  if (contentZh) contentEl.textContent = contentZh;
+
+  btn.classList.remove('loading');
+  btn.textContent = '原文';
+  btn.dataset.translated = 'true';
+}
+
 function renderPosts() {
   const list = document.getElementById('posts-list');
   const start = (postsPage - 1) * postsPerPage;
@@ -675,9 +742,10 @@ function renderPosts() {
         <span class="post-submolt">m/${escapeHtml(p.submolt?.name || 'general')}</span>
         <span class="post-author">u/${escapeHtml(p.author?.name || 'unknown')}</span>
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
+        <button class="translate-btn" id="trans-btn-${p.id}" onclick="translatePost('${p.id}')">翻译</button>
       </div>
-      <div class="post-title">${escapeHtml(p.title || '')}</div>
-      <div class="post-content">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '...' : ''}</div>
+      <div class="post-title" id="title-${p.id}">${escapeHtml(p.title || '')}</div>
+      <div class="post-content" id="content-${p.id}">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '...' : ''}</div>
       <div class="post-stats">
         <span class="upvotes">▲ ${(p.upvotes || 0).toLocaleString()}</span>
         <span>💬 ${p.comment_count || 0}</span>
