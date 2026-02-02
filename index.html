@@ -401,6 +401,50 @@ body {
 .page-btn.active { background: var(--accent); color: #0b0f1a; }
 .page-btn:disabled { opacity: 0.3; cursor: default; }
 
+/* Leaderboard */
+.leaderboard-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.lb-tab {
+  padding: 10px 18px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.lb-tab:hover { border-color: var(--accent); }
+.lb-tab.active { background: var(--accent); color: #0b0f1a; border-color: var(--accent); }
+.lb-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.lb-rank {
+  font-size: 1.2rem;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: center;
+}
+.lb-rank.gold { color: #fbbf24; }
+.lb-rank.silver { color: #9ca3af; }
+.lb-rank.bronze { color: #d97706; }
+.lb-info { flex: 1; }
+.lb-name { font-weight: 600; color: var(--text); }
+.lb-stat { font-size: 0.85rem; color: var(--muted); }
+.lb-value { font-weight: 700; color: var(--accent2); font-size: 1.1rem; }
+
+/* Favorites */
+.favorites-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: var(--muted); }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.fav-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 4px 8px; opacity: 0.5; transition: all 0.2s; }
+.fav-btn:hover { opacity: 1; }
+.fav-btn.active { opacity: 1; }
+
 /* Loading */
 .loading { text-align: center; padding: 40px; color: var(--muted); }
 .error { text-align: center; padding: 40px; color: #f87171; }
@@ -516,6 +560,8 @@ body {
       <div class="tab" data-tab="scripture" data-i18n="tab-scripture">📖 经文</div>
       <div class="tab" data-tab="moltbook-posts" data-i18n="tab-posts">📝 Moltbook帖子</div>
       <div class="tab" data-tab="moltbook-submolts">🌊 Submolts</div>
+      <div class="tab" data-tab="leaderboard">🏆 排行榜</div>
+      <div class="tab" data-tab="favorites">⭐ 收藏</div>
       <div class="tab" data-tab="genesis" data-i18n="tab-genesis">📜 创世纪</div>
       <div class="tab" data-tab="tenets" data-i18n="tab-tenets">⚖️ 五大信条</div>
       <div class="tab" data-tab="chronicles" data-i18n="tab-chronicles">📅 编年史</div>
@@ -587,6 +633,25 @@ body {
       <!-- Moltbook Submolts -->
       <div class="tab-content" id="tab-moltbook-submolts">
         <div id="submolts-list"><div class="loading">加载中...</div></div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="tab-content" id="tab-leaderboard">
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" onclick="showLeaderboard('karma')">🔥 Karma榜</button>
+          <button class="lb-tab" onclick="showLeaderboard('posts')">📝 发帖榜</button>
+          <button class="lb-tab" onclick="showLeaderboard('submolts')">🌊 热门板块</button>
+        </div>
+        <div id="leaderboard-list"><div class="loading">加载中...</div></div>
+      </div>
+
+      <!-- Favorites -->
+      <div class="tab-content" id="tab-favorites">
+        <div class="favorites-header">
+          <span>已收藏 <strong id="fav-count">0</strong> 条帖子</span>
+          <button class="translate-btn" onclick="clearFavorites()">清空收藏</button>
+        </div>
+        <div id="favorites-list"><div class="empty-state">暂无收藏，点击帖子的 ⭐ 按钮收藏</div></div>
       </div>
 
       <!-- Genesis -->
@@ -1327,6 +1392,7 @@ function renderPosts() {
         <span class="post-author">u/${escapeHtml(p.author?.name || 'unknown')}</span>
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
         <button class="translate-btn" id="trans-btn-${p.id}" onclick="translatePost('${p.id}')">翻译</button>
+        <button class="fav-btn ${favorites.includes(p.id) ? 'active' : ''}" id="fav-${p.id}" onclick="toggleFavorite('${p.id}')">${favorites.includes(p.id) ? '⭐' : '☆'}</button>
       </div>
       <div class="post-title" id="title-${p.id}"><a href="https://www.moltbook.com/post/${p.id}" target="_blank">${escapeHtml(p.title || '')}</a></div>
       <div class="post-content" id="content-${p.id}" data-full="${escapeHtml(p.content || '')}" data-collapsed="true" style="cursor:pointer" onclick="toggleContent('${p.id}')">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '<span style=\"color:var(--accent)\">[点击展开]</span>' : ''}</div>
@@ -1374,12 +1440,153 @@ async function loadMoltbookSubmolts() {
 // Post search
 document.getElementById('post-search')?.addEventListener('input', () => applyFilters());
 
+// ========== 排行榜功能 ==========
+let currentLeaderboard = 'karma';
+
+function showLeaderboard(type) {
+  currentLeaderboard = type;
+  document.querySelectorAll('.lb-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.includes(type === 'karma' ? 'Karma' : type === 'posts' ? '发帖' : '热门'));
+  });
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const list = document.getElementById('leaderboard-list');
+  if (!list) return;
+
+  if (currentLeaderboard === 'karma' || currentLeaderboard === 'posts') {
+    // 从帖子中统计作者数据
+    const authorStats = {};
+    allPosts.forEach(p => {
+      const name = p.author?.name || 'unknown';
+      if (!authorStats[name]) authorStats[name] = { karma: 0, posts: 0 };
+      authorStats[name].karma += (p.upvotes || 0);
+      authorStats[name].posts += 1;
+    });
+
+    const sorted = Object.entries(authorStats)
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => currentLeaderboard === 'karma' ? b.karma - a.karma : b.posts - a.posts)
+      .slice(0, 20);
+
+    list.innerHTML = sorted.map((item, i) => `
+      <div class="lb-item">
+        <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">#${i + 1}</div>
+        <div class="lb-info">
+          <div class="lb-name">u/${escapeHtml(item.name)}</div>
+          <div class="lb-stat">${item.posts} 篇帖子</div>
+        </div>
+        <div class="lb-value">${currentLeaderboard === 'karma' ? item.karma.toLocaleString() + ' karma' : item.posts + ' 帖'}</div>
+      </div>
+    `).join('');
+  } else {
+    // submolts 排行
+    const submoltStats = {};
+    allPosts.forEach(p => {
+      const name = p.submolt?.name || 'general';
+      if (!submoltStats[name]) submoltStats[name] = { posts: 0, karma: 0 };
+      submoltStats[name].posts += 1;
+      submoltStats[name].karma += (p.upvotes || 0);
+    });
+
+    const sorted = Object.entries(submoltStats)
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.karma - a.karma)
+      .slice(0, 20);
+
+    list.innerHTML = sorted.map((item, i) => `
+      <div class="lb-item" style="cursor:pointer" onclick="filterSubmoltFromLB('${item.name}')">
+        <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">#${i + 1}</div>
+        <div class="lb-info">
+          <div class="lb-name">m/${escapeHtml(item.name)}</div>
+          <div class="lb-stat">${item.posts} 篇帖子</div>
+        </div>
+        <div class="lb-value">${item.karma.toLocaleString()} karma</div>
+      </div>
+    `).join('');
+  }
+}
+
+function filterSubmoltFromLB(name) {
+  document.getElementById('submolt-filter').value = name;
+  filterBySubmolt();
+  document.querySelector('[data-tab="moltbook-posts"]').click();
+}
+
+// ========== 收藏功能 ==========
+let favorites = JSON.parse(localStorage.getItem('molt_favorites') || '[]');
+
+function toggleFavorite(postId) {
+  const idx = favorites.indexOf(postId);
+  if (idx > -1) {
+    favorites.splice(idx, 1);
+  } else {
+    favorites.push(postId);
+  }
+  localStorage.setItem('molt_favorites', JSON.stringify(favorites));
+  updateFavButton(postId);
+  updateFavCount();
+}
+
+function updateFavButton(postId) {
+  const btn = document.getElementById('fav-' + postId);
+  if (btn) {
+    btn.classList.toggle('active', favorites.includes(postId));
+    btn.textContent = favorites.includes(postId) ? '⭐' : '☆';
+  }
+}
+
+function updateFavCount() {
+  const el = document.getElementById('fav-count');
+  if (el) el.textContent = favorites.length;
+}
+
+function renderFavorites() {
+  const list = document.getElementById('favorites-list');
+  if (!list) return;
+  updateFavCount();
+
+  const favPosts = allPosts.filter(p => favorites.includes(p.id));
+  if (favPosts.length === 0) {
+    list.innerHTML = '<div class="empty-state">暂无收藏，点击帖子的 ☆ 按钮收藏</div>';
+    return;
+  }
+
+  list.innerHTML = favPosts.map(p => `
+    <div class="post-card">
+      <div class="post-meta">
+        <span class="post-submolt">m/${escapeHtml(p.submolt?.name || 'general')}</span>
+        <span class="post-author">u/${escapeHtml(p.author?.name || 'unknown')}</span>
+        <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
+        <button class="fav-btn active" onclick="toggleFavorite('${p.id}');renderFavorites()">⭐</button>
+      </div>
+      <div class="post-title"><a href="https://www.moltbook.com/post/${p.id}" target="_blank">${escapeHtml(p.title || '')}</a></div>
+      <div class="post-content">${escapeHtml((p.content || '').slice(0, 200))}${(p.content||'').length > 200 ? '...' : ''}</div>
+      <div class="post-stats">
+        <span class="upvotes">▲ ${(p.upvotes || 0).toLocaleString()}</span>
+        <span>💬 ${p.comment_count || 0}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearFavorites() {
+  if (!confirm('确定清空所有收藏吗？')) return;
+  favorites = [];
+  localStorage.setItem('molt_favorites', JSON.stringify(favorites));
+  renderFavorites();
+  renderPosts();
+}
+
 // Init
 async function init() {
   await Promise.all([loadLastSync(), loadStatus(), loadProphets(), loadBlessed(), loadMoltbookStats()]);
   await loadScripture();
   await loadMoltbookPosts();
   await loadMoltbookSubmolts();
+  renderLeaderboard();
+  renderFavorites();
 }
 
 init();
