@@ -20,6 +20,19 @@
   --green: #22c55e;
 }
 
+[data-theme="light"] {
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --card-2: #f0f2f5;
+  --border: #e1e5eb;
+  --text: #1a1a2e;
+  --muted: #6b7280;
+  --accent: #6d4aff;
+  --accent2: #0d9488;
+  --accent3: #ea580c;
+  --green: #16a34a;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -285,6 +298,7 @@ body {
 .comment-meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; display: flex; gap: 12px; align-items: center; }
 .comment-author { color: var(--accent); }
 .comment-content { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+.comment-replies { margin-left: 20px; padding-left: 12px; border-left: 2px solid var(--border); margin-top: 8px; }
 .translate-btn {
   padding: 4px 10px;
   font-size: 0.7rem;
@@ -350,6 +364,25 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .search-box:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,255,0.2); }
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.filter-bar .search-box { margin-bottom: 0; }
+.filter-select {
+  padding: 10px 14px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-width: 100px;
+}
+.filter-select:focus { outline: none; border-color: var(--accent); }
 
 /* Pagination */
 .pagination {
@@ -468,6 +501,7 @@ body {
     <div class="lang-switch">
       <button class="lang-btn active" onclick="setLang('zh')">中文</button>
       <button class="lang-btn" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" id="theme-btn" onclick="toggleTheme()">☀️</button>
     </div>
 
     <div class="side-meta">
@@ -535,7 +569,17 @@ body {
 
       <!-- Moltbook Posts -->
       <div class="tab-content" id="tab-moltbook-posts">
-        <input type="text" class="search-box" id="post-search" placeholder="🔍 搜索帖子...">
+        <div class="filter-bar">
+          <input type="text" class="search-box" id="post-search" placeholder="🔍 搜索帖子..." style="flex:1">
+          <select id="submolt-filter" class="filter-select" onchange="filterBySubmolt()">
+            <option value="">全部板块</option>
+          </select>
+          <select id="sort-select" class="filter-select" onchange="sortPosts()">
+            <option value="hot">🔥 热度</option>
+            <option value="new">🕐 最新</option>
+            <option value="comments">💬 评论数</option>
+          </select>
+        </div>
         <div id="posts-list"><div class="loading">加载中...</div></div>
         <div class="pagination" id="posts-pagination"></div>
       </div>
@@ -709,6 +753,28 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
   });
 });
+
+// 主题切换
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.getElementById('theme-btn');
+  const isLight = html.dataset.theme === 'light';
+  html.dataset.theme = isLight ? '' : 'light';
+  btn.textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('theme', isLight ? 'dark' : 'light');
+}
+
+// 初始化主题
+(function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') {
+    document.documentElement.dataset.theme = 'light';
+    setTimeout(() => {
+      const btn = document.getElementById('theme-btn');
+      if (btn) btn.textContent = '🌙';
+    }, 0);
+  }
+})();
 
 // 语言切换
 function setLang(lang) {
@@ -1042,6 +1108,8 @@ let allPosts = [];
 let filteredPosts = [];
 let postsPage = 1;
 const postsPerPage = 20;
+let currentSort = 'hot';
+let currentSubmolt = '';
 
 // Load Moltbook stats
 async function loadMoltbookStats() {
@@ -1059,7 +1127,51 @@ async function loadMoltbookPosts() {
   if (!data || !data.posts) return;
   allPosts = data.posts;
   filteredPosts = allPosts;
+  initSubmoltFilter();
+  sortPosts();
+}
+
+// 初始化 Submolt 筛选
+function initSubmoltFilter() {
+  const select = document.getElementById('submolt-filter');
+  if (!select) return;
+  const submolts = [...new Set(allPosts.map(p => p.submolt?.name).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">全部板块</option>' + submolts.map(s => `<option value="${s}">m/${s}</option>`).join('');
+}
+
+// 排序帖子
+function sortPosts() {
+  const select = document.getElementById('sort-select');
+  currentSort = select?.value || 'hot';
+  let sorted = [...filteredPosts];
+  if (currentSort === 'hot') {
+    sorted.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+  } else if (currentSort === 'new') {
+    sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  } else if (currentSort === 'comments') {
+    sorted.sort((a, b) => (b.comment_count || 0) - (a.comment_count || 0));
+  }
+  filteredPosts = sorted;
+  postsPage = 1;
   renderPosts();
+}
+
+// 按 Submolt 筛选
+function filterBySubmolt() {
+  const select = document.getElementById('submolt-filter');
+  currentSubmolt = select?.value || '';
+  applyFilters();
+}
+
+// 应用所有筛选
+function applyFilters() {
+  const q = document.getElementById('post-search')?.value.toLowerCase() || '';
+  filteredPosts = allPosts.filter(p => {
+    const matchSubmolt = !currentSubmolt || p.submolt?.name === currentSubmolt;
+    const matchSearch = !q || (p.title || '').toLowerCase().includes(q) || (p.content || '').toLowerCase().includes(q) || (p.author?.name || '').toLowerCase().includes(q);
+    return matchSubmolt && matchSearch;
+  });
+  sortPosts();
 }
 
 // 翻译缓存
@@ -1149,16 +1261,22 @@ async function loadComments(postId) {
     const resp = await fetch(`https://www.moltbook.com/api/v1/posts/${postId}`);
     const data = await resp.json();
     if (data.comments && data.comments.length > 0) {
-      container.innerHTML = data.comments.slice(0, 20).map((c, i) => `
-        <div class="comment-item">
-          <div class="comment-meta">
-            <span class="comment-author">u/${escapeHtml(c.author?.name || 'unknown')}</span>
-            <span>${c.created_at ? c.created_at.slice(0,10) : ''}</span>
-            <button class="translate-btn" id="comment-trans-${postId}-${i}" onclick="translateComment('${postId}', ${i})">翻译</button>
-          </div>
-          <div class="comment-content" id="comment-content-${postId}-${i}">${escapeHtml(c.content || '')}</div>
-        </div>
-      `).join('');
+      let idx = 0;
+      const renderComment = (c, depth = 0) => {
+        const i = idx++;
+        const replies = (c.replies || []).map(r => renderComment(r, depth + 1)).join('');
+        return `
+          <div class="comment-item" style="${depth > 0 ? 'border-bottom:none;padding:6px 0' : ''}">
+            <div class="comment-meta">
+              <span class="comment-author">u/${escapeHtml(c.author?.name || 'unknown')}</span>
+              <span>${c.created_at ? c.created_at.slice(0,10) : ''}</span>
+              <button class="translate-btn" id="comment-trans-${postId}-${i}" onclick="translateComment('${postId}', ${i})">翻译</button>
+            </div>
+            <div class="comment-content" id="comment-content-${postId}-${i}">${escapeHtml(c.content || '')}</div>
+            ${replies ? `<div class="comment-replies">${replies}</div>` : ''}
+          </div>`;
+      };
+      container.innerHTML = data.comments.slice(0, 15).map(c => renderComment(c)).join('');
       container.style.display = 'block';
       btn.textContent = '收起评论';
     } else {
@@ -1254,20 +1372,7 @@ async function loadMoltbookSubmolts() {
 }
 
 // Post search
-document.getElementById('post-search')?.addEventListener('input', (e) => {
-  const q = e.target.value.toLowerCase();
-  if (!q) {
-    filteredPosts = allPosts;
-  } else {
-    filteredPosts = allPosts.filter(p =>
-      (p.title || '').toLowerCase().includes(q) ||
-      (p.content || '').toLowerCase().includes(q) ||
-      (p.author?.name || '').toLowerCase().includes(q)
-    );
-  }
-  postsPage = 1;
-  renderPosts();
-});
+document.getElementById('post-search')?.addEventListener('input', () => applyFilters());
 
 // Init
 async function init() {
