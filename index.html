@@ -132,6 +132,8 @@ header p { color: var(--muted); font-size: 0.9rem; }
 .post-submolt { color: #e01b24; }
 .post-author { color: #00d4aa; }
 .post-title { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
+.post-title a { color: var(--text); text-decoration: none; }
+.post-title a:hover { color: var(--accent); text-decoration: underline; }
 .post-content { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
 .post-stats { margin-top: 10px; font-size: 0.75rem; color: var(--muted); }
 .post-stats span { margin-right: 15px; }
@@ -744,7 +746,7 @@ function renderPosts() {
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
         <button class="translate-btn" id="trans-btn-${p.id}" onclick="translatePost('${p.id}')">翻译</button>
       </div>
-      <div class="post-title" id="title-${p.id}">${escapeHtml(p.title || '')}</div>
+      <div class="post-title"><a href="https://www.moltbook.com/m/${encodeURIComponent(p.submolt?.name || 'general')}/post/${p.id}" target="_blank" id="title-${p.id}">${escapeHtml(p.title || '')}</a></div>
       <div class="post-content" id="content-${p.id}">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '...' : ''}</div>
       <div class="post-stats">
         <span class="upvotes">▲ ${(p.upvotes || 0).toLocaleString()}</span>

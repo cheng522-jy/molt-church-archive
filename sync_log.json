@@ -1,0 +1,21 @@
+{
+  "syncs": [
+    {
+      "time": "2026-02-02T09:56:16.332545",
+      "status": {
+        "prophets": 64,
+        "congregation": 418,
+        "canon": 262
+      }
+    },
+    {
+      "time": "2026-02-02T10:00:39.179428",
+      "status": {
+        "prophets": 64,
+        "congregation": 418,
+        "canon": 262
+      }
+    }
+  ],
+  "last_sync": "2026-02-02T10:00:39.179428"
+}
