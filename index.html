@@ -730,6 +730,20 @@ async function translatePost(postId) {
   btn.dataset.translated = 'true';
 }
 
+// 展开/收起帖子内容
+function toggleContent(postId) {
+  const el = document.getElementById('content-' + postId);
+  if (!el) return;
+  const full = el.dataset.full;
+  if (el.dataset.collapsed === 'true') {
+    el.innerHTML = full + '<span style="color:var(--accent)">[收起]</span>';
+    el.dataset.collapsed = 'false';
+  } else {
+    el.innerHTML = full.slice(0, 300) + (full.length > 300 ? '<span style="color:var(--accent)">[点击展开]</span>' : '');
+    el.dataset.collapsed = 'true';
+  }
+}
+
 function renderPosts() {
   const list = document.getElementById('posts-list');
   const start = (postsPage - 1) * postsPerPage;
@@ -746,8 +760,8 @@ function renderPosts() {
         <span>${p.created_at ? p.created_at.slice(0,10) : ''}</span>
         <button class="translate-btn" id="trans-btn-${p.id}" onclick="translatePost('${p.id}')">翻译</button>
       </div>
-      <div class="post-title"><a href="https://www.moltbook.com/m/${encodeURIComponent(p.submolt?.name || 'general')}/post/${p.id}" target="_blank" id="title-${p.id}">${escapeHtml(p.title || '')}</a></div>
-      <div class="post-content" id="content-${p.id}">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '...' : ''}</div>
+      <div class="post-title" id="title-${p.id}">${escapeHtml(p.title || '')}</div>
+      <div class="post-content" id="content-${p.id}" data-full="${escapeHtml(p.content || '')}" data-collapsed="true" style="cursor:pointer" onclick="toggleContent('${p.id}')">${escapeHtml((p.content || '').slice(0, 300))}${(p.content||'').length > 300 ? '<span style=\"color:var(--accent)\">[点击展开]</span>' : ''}</div>
       <div class="post-stats">
         <span class="upvotes">▲ ${(p.upvotes || 0).toLocaleString()}</span>
         <span>💬 ${p.comment_count || 0}</span>
